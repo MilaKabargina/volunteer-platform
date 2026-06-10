@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: volunteer-postgres
+    environment:
+      POSTGRES_DB: volunteer_db
+      POSTGRES_USER: volunteer_user
+      POSTGRES_PASSWORD: volunteer_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U volunteer_user -d volunteer_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - volunteer-network
+
+  app:
+    build: .
+    container_name: volunteer-app
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/volunteer_db
+      SPRING_DATASOURCE_USERNAME: volunteer_user
+      SPRING_DATASOURCE_PASSWORD: volunteer_password
+      SPRING_DATASOURCE_DRIVER: org.postgresql.Driver
+      SPRING_H2_CONSOLE_ENABLED: false
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_JPA_FORMAT_SQL: "true"
+      JWT_SECRET: mySuperSecretKey_1234567890123456789012345678901234567890
+      JWT_EXPIRATION: "3600000"
+      LOG_FILE_NAME: /logs/application.log
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - app_logs:/logs
+    networks:
+      - volunteer-network
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: volunteer-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@volunteer.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - volunteer-network
+    restart: unless-stopped
+
+networks:
+  volunteer-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  app_logs:
